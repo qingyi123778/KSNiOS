@@ -19,10 +19,23 @@ jobs:
 
       - name: 拉取 iOS SDK
         run: |
+          set -x
           mkdir -p "$HOME/theos/sdks"
+          if [ -d "$HOME/theos/sdks/iPhoneOS16.5.sdk" ]; then
+            echo "SDK 已就位，跳过下载"
+            exit 0
+          fi
           SDK_URL="https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz"
-          echo "取 $SDK_URL"
-          curl -fL --retry 3 --retry-delay 2 -o /tmp/sdk.tar.xz "$SDK_URL"
+          ok=0
+          for i in 1 2 3 4 5; do
+            echo "--- 下载尝试 $i ---"
+            if curl -fL --retry 3 --retry-all-errors --retry-delay 2 \
+                    --connect-timeout 20 --max-time 180 \
+                    -o /tmp/sdk.tar.xz "$SDK_URL"; then ok=1; break; fi
+            rm -f /tmp/sdk.tar.xz
+            sleep 5
+          done
+          [ "$ok" = "1" ] || { echo "::error::SDK 五次都下不下来"; exit 1; }
           ls -lh /tmp/sdk.tar.xz
           tar -xJf /tmp/sdk.tar.xz -C "$HOME/theos/sdks"
           ls -1 "$HOME/theos/sdks"
