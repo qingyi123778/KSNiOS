@@ -11,6 +11,7 @@ TWEAK_NAME = KSNiOS
 KSNiOS_FILES = Tweak.xm \
 	Sources/KSNStore.m \
 	Sources/KSNBridge.m \
+	Sources/KSNNet.m \
 	Sources/KSNWebInjector.m \
 	Sources/KSNNotifier.m \
 	Sources/KSNLifecycle.m \

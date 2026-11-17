@@ -1,6 +1,7 @@
 #import "KSNBridge.h"
 #import "KSNStore.h"
 #import "KSNNotifier.h"
+#import "KSNNet.h"
 #import <objc/runtime.h>
 
 static NSString *const kKSNBridgeName = @"ksnmsg";
@@ -45,6 +46,17 @@ static void *kKSNBridgeAttached = &kKSNBridgeAttached;
       didReceiveScriptMessage:(WKScriptMessage *)message
                  replyHandler:(void (^)(id _Nullable, NSString *_Nullable))replyHandler
 {
+    NSDictionary *body = [message.body isKindOfClass:NSDictionary.class] ? message.body : @{};
+    NSString *cmd = [body[@"cmd"] isKindOfClass:NSString.class] ? body[@"cmd"] : @"";
+
+    /* 网络请求走异步：replyHandler 由 NSURLSession 回调里触发，
+       这里直接接管整条回复路径，不能先 return 再调。 */
+    if ([cmd isEqualToString:@"net"]) {
+        NSDictionary *a = [body[@"args"] isKindOfClass:NSDictionary.class] ? body[@"args"] : @{};
+        KSNNetRequest(a, ^(NSDictionary *r) { replyHandler(r, nil); });
+        return;
+    }
+
     id out = nil;
     @try {
         out = [self dispatch:message];

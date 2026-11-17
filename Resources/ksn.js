@@ -9,7 +9,9 @@
   window.__KSN_IOS = 1;
 
   var host = location.hostname || "";
-  if (!(/chaoxing|superstar|course|ocs|welearn|xuexitong/i.test(host) || host === "")) return;
+  /* about:blank 上跑没有意义，只会把状态刷成 "Load failed" 噪音 */
+  if (!host) return;
+  if (!/chaoxing|superstar|course|ocs|welearn|xuexitong/i.test(host)) return;
 
   var API = {
     activelist: "https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist?fid=0&showNotStartedActive=0",
@@ -31,6 +33,23 @@
   }
   function log(m)   { call("log", { m: String(m) }); }
   function state(m) { window.__ksn_state = String(m); call("state", { m: String(m) }); }
+
+  /* 所有接口走原生 NSURLSession。
+     WKWebView 的 fetch 会带不可控的存储策略和 UA，也拿不到全部 cookie，
+     而且 WebView 里所有签到接口都返回 tengine 的 500 —— 直连才能分清是服务端还是通道。 */
+  function netReq(url, method, body) {
+    return call("net", { url: url, method: method || "GET", body: body || "" })
+      .then(function (r) {
+        if (r && typeof r === "object") return r;
+        return { ok: false, status: 0, body: "", err: "桥无响应", ncookie: 0 };
+      });
+  }
+  function brief(r) {
+    var t = String((r && r.body) || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return "HTTP " + ((r && r.status) || 0) +
+           (r && r.ncookie != null ? " c" + r.ncookie : "") +
+           (t ? " " + t.slice(0, 90) : (r && r.err ? " " + r.err : ""));
+  }
 
   function loadCfg() {
     return call("cfg").then(function (c) {
@@ -78,38 +97,31 @@
 
   /* ---------- 签到码 ---------- */
   function freshSignCode(apid) {
-    return fetch(API.signDetail, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                 "X-Requested-With": "XMLHttpRequest" },
-      body: "activePrimaryId=" + encodeURIComponent(apid) + "&appType=15&msg="
-    }).then(function (r) { return r.json(); })
-      .then(function (o) {
+    return netReq(API.signDetail, "POST",
+                  "activePrimaryId=" + encodeURIComponent(apid) + "&appType=15&msg=")
+      .then(function (r) {
+        if (!r.ok) { log("signDetail " + brief(r)); return call("signcode", {}); }
+        var o;
+        try { o = JSON.parse(r.body || "{}"); }
+        catch (e) { return call("signcode", {}); }
         var c = (o && o.signCode) || (o && o.data && o.data.signCode) || "";
         if (c) { call("signcode", { c: c }); return c; }
         return call("signcode", {});
       })
-      .catch(function () { return call("signcode", {}); })
       .then(function (c) { return typeof c === "string" ? c : ""; });
   }
 
   /* ---------- 活动列表 ---------- */
   function fetchActives() {
-    return fetch(API.activelist, {
-      credentials: "include",
-      headers: { "X-Requested-With": "XMLHttpRequest" }
-    }).then(function (r) {
-      if (!r.ok) return { recs: [], raw: "HTTP " + r.status };
-      return r.text().then(function (t) {
-        var j;
-        try { j = JSON.parse(t); }
-        catch (e) { return { recs: [], raw: "非JSON " + t.slice(0, 100) }; }
-        var recs = (j && j.records) || (j && j.data && j.data.records) || (j && j.data) || [];
-        if (!Array.isArray(recs)) recs = (recs && recs.records) || [];
-        return { recs: recs, raw: t };
-      });
-    }).catch(function (e) {
-      return { recs: [], raw: "fetch失败 " + ((e && e.message) || e) };
+    return netReq(API.activelist, "GET").then(function (r) {
+      if (!r.ok) return { recs: [], raw: brief(r) };
+      var t = r.body || "";
+      var j;
+      try { j = JSON.parse(t); }
+      catch (e) { return { recs: [], raw: "非JSON " + brief(r) }; }
+      var recs = (j && j.records) || (j && j.data && j.data.records) || (j && j.data) || [];
+      if (!Array.isArray(recs)) recs = (recs && recs.records) || [];
+      return { recs: recs, raw: t };
     });
   }
 
@@ -178,17 +190,12 @@
           form.set("location", JSON.stringify({ result: 1, latitude: lat, longitude: lng, address: addr }));
         }
 
-        return fetch(API.stuSign, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/x-www-form-urlencoded",
-                     "X-Requested-With": "XMLHttpRequest",
-                     "Referer": "https://mobilelearn.chaoxing.com/" },
-          body: form.toString()
-        }).then(function (r) { return r.text(); })
-          .then(function (t) {
+        return netReq(API.stuSign, "POST", form.toString())
+          .then(function (r) {
+            var t = (r && r.body) || "";
             signedSet[apid] = 1;
-            log("签到 " + apid + " code=" + (code || "-") + " → " + t.slice(0, 60));
-            return { apid: apid, ok: /success|成功/i.test(t), text: t };
+            log("签到 " + apid + " code=" + (code || "-") + " → " + brief(r));
+            return { apid: apid, ok: !!(r && r.ok) && /success|成功/i.test(t), text: t };
           });
       });
     }).catch(function (e) {
