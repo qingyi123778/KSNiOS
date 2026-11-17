@@ -98,13 +98,19 @@
     return fetch(API.activelist, {
       credentials: "include",
       headers: { "X-Requested-With": "XMLHttpRequest" }
-    }).then(function (r) { return r.json(); })
-      .then(function (j) {
+    }).then(function (r) {
+      if (!r.ok) return { recs: [], raw: "HTTP " + r.status };
+      return r.text().then(function (t) {
+        var j;
+        try { j = JSON.parse(t); }
+        catch (e) { return { recs: [], raw: "非JSON " + t.slice(0, 100) }; }
         var recs = (j && j.records) || (j && j.data && j.data.records) || (j && j.data) || [];
         if (!Array.isArray(recs)) recs = (recs && recs.records) || [];
-        return recs;
-      })
-      .catch(function (e) { log("activelist 失败 " + e); return []; });
+        return { recs: recs, raw: t };
+      });
+    }).catch(function (e) {
+      return { recs: [], raw: "fetch失败 " + ((e && e.message) || e) };
+    });
   }
 
   /* ---------- 人脸上传（可靠性低，只是把已存照片传上去换 faceCode） ---------- */
@@ -139,7 +145,10 @@
     var cid  = item.courseId || item.cid;
     var clid = item.classId || item.classid;
     var st   = (item.signStatus != null) ? item.signStatus : item.status;
-    if (!apid || !cid || st === 1 || signedSet[apid]) return Promise.resolve(null);
+    if (!apid || !cid || Number(st) === 1 || signedSet[apid]) {
+      log("skip apid=" + apid + " cid=" + cid + " st=" + st + " keys=" + Object.keys(item).join(","));
+      return Promise.resolve(null);
+    }
 
     return freshSignCode(String(apid)).then(function (code) {
       return uploadFace().then(function (fid) {
@@ -192,30 +201,38 @@
   function signAll(trigger) {
     if (running) return Promise.resolve([]);
     running = true;
-    state("扫描签到活动…");
+    var who = host || "blank";
+    state("[" + who + "] 扫描中…");
 
     return loadCfg()
       .then(function () { patchGeo(); return fetchActives(); })
-      .then(function (recs) {
-        if (!recs.length) { state("没有待签活动"); return []; }
-        state("发现 " + recs.length + " 项活动");
+      .then(function (res) {
+        if (!res.recs.length) return { total: 0, done: [], raw: res.raw };
         var done = [];
-        return recs.reduce(function (chain, it) {
+        return res.recs.reduce(function (chain, it) {
           return chain.then(function () {
             return signOne(it).then(function (r) { if (r) done.push(r); });
           });
-        }, Promise.resolve()).then(function () { return done; });
+        }, Promise.resolve()).then(function () {
+          return { total: res.recs.length, done: done, raw: res.raw };
+        });
       })
-      .then(function (done) {
-        var ok = done.filter(function (r) { return r.ok; }).length;
-        var msg = done.length ? ("提交 " + done.length + " 项，成功 " + ok + " 项") : "无待签活动";
-        state(msg);
-        if (trigger === "manual" || ok > 0) call("notify", { title: "签到完成", body: msg });
+      .then(function (r) {
+        if (!r.total) {
+          state("[" + who + "] 列表空 → " + String(r.raw || "").slice(0, 110));
+        } else if (!r.done.length) {
+          state("[" + who + "] " + r.total + " 项全部跳过（已签或字段缺失）");
+        } else {
+          var ok = r.done.filter(function (x) { return x.ok; }).length;
+          var msg = "提交 " + r.done.length + "/" + r.total + "，成功 " + ok;
+          state("[" + who + "] " + msg);
+          call("notify", { title: "签到", body: msg });
+        }
         running = false;
-        return done;
+        return r.done;
       })
       .catch(function (e) {
-        state("签到失败 " + e);
+        state("[" + who + "] 失败 " + ((e && e.message) || e));
         running = false;
         return [];
       });
