@@ -8,9 +8,13 @@ NS_ASSUME_NONNULL_BEGIN
    cookie 与主 webview 共享同一个 WKWebsiteDataStore，登录态直接复用。
 
    代价：多一个 webview 实例。跑完就丢，不留常驻。 */
+__BEGIN_DECLS
+
 void KSNStartBackgroundSign(void);
 
 /* 定时器开关，跟 autoSign 配置联动。 */
 void KSNSetBackgroundSignEnabled(BOOL enabled);
+
+__END_DECLS
 
 NS_ASSUME_NONNULL_END
