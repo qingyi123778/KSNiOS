@@ -186,8 +186,10 @@ static UIWindowScene *KSNForegroundScene(void) {
     [go.heightAnchor constraintEqualToConstant:46].active = YES;
     [go addAction:[UIAction actionWithHandler:^(__kindof UIAction *a) {
         KSNStore.shared.signNow = YES;
-        KSNBridge.shared.lastStatus =
-            [NSString stringWithFormat:@"%@ 已下发签到指令", [NSDate date]];
+        [KSNBridge.shared setStatus:[NSString stringWithFormat:@"%@ 已下发签到指令",
+                                     [NSDateFormatter localizedStringFromDate:[NSDate date]
+                                                                   dateStyle:NSDateFormatterNoStyle
+                                                                   timeStyle:NSDateFormatterMediumStyle]]];
     }] forControlEvents:UIControlEventTouchUpInside];
     [stack addArrangedSubview:go];
 

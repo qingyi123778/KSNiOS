@@ -35,6 +35,10 @@ static void *kKSNBridgeAttached = &kKSNBridgeAttached;
     }
 }
 
+- (void)setStatus:(NSString *)text {
+    self.lastStatus = text ?: @"";
+}
+
 #pragma mark - WKScriptMessageHandlerWithReply
 
 - (void)userContentController:(WKUserContentController *)userContentController

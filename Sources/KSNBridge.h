@@ -15,6 +15,9 @@ NS_ASSUME_NONNULL_BEGIN
 /* 最近一次 JS 上报的状态行，面板直接读，不落盘。 */
 @property (nonatomic, copy, readonly) NSString *lastStatus;
 
+/* 外部写状态走这个方法 —— 属性本身对头文件是只读的。 */
+- (void)setStatus:(nullable NSString *)text;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -37,10 +37,10 @@ static UIWindow *KSNHostWindow(void) {
     if (!st.autoSign && !st.signNow) return;
 
     UIWindow *host = KSNHostWindow();
-    if (!host) { KSNBridge.shared.lastStatus = @"后台签到：没有可用窗口"; return; }
+    if (!host) { [KSNBridge.shared setStatus:@"后台签到：没有可用窗口"]; return; }
 
     self.busy = YES;
-    KSNBridge.shared.lastStatus = @"后台签到：加载 mobilelearn…";
+    [KSNBridge.shared setStatus:@"后台签到：加载 mobilelearn…"];
 
     WKWebViewConfiguration *cfg = [WKWebViewConfiguration new];
     /* 关键：和主 webview 共用同一个 dataStore，登录 cookie 直接复用，不需要重新登录 */
@@ -88,7 +88,7 @@ static UIWindow *KSNHostWindow(void) {
     [self.web removeFromSuperview];
     self.web = nil;
     self.busy = NO;
-    if (reason.length) KSNBridge.shared.lastStatus = [@"后台签到：" stringByAppendingString:reason];
+    if (reason.length) [KSNBridge.shared setStatus:[@"后台签到：" stringByAppendingString:reason]];
     NSLog(@"[KSN] 后台签到结束 — %@", reason);
 }
 
