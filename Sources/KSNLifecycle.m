@@ -3,29 +3,33 @@
 #import "KSNNotifier.h"
 #import <UIKit/UIKit.h>
 
-static UIBackgroundTaskIdentifier kKSNBGTask = UIBackgroundTaskInvalid;
+/* UIBackgroundTaskInvalid 是 extern const，不是编译期常量，不能做静态初始化。
+   用独立标志位记录有效性，不依赖它具体是 0 还是 NSUIntegerMax。 */
+static UIBackgroundTaskIdentifier kKSNBGTask;
+static BOOL kKSNBGActive = NO;
 
 static void KSNBeginBGTask(void) {
     UIApplication *app = UIApplication.sharedApplication;
     if (!app) return;
-    if (kKSNBGTask != UIBackgroundTaskInvalid) return;
+    if (kKSNBGActive) return;
 
     kKSNBGTask = [app beginBackgroundTaskWithName:@"KSN.sign" expirationHandler:^{
         NSLog(@"[KSN] 后台额度耗尽，进程即将挂起");
-        if (kKSNBGTask != UIBackgroundTaskInvalid) {
+        if (kKSNBGActive) {
             [app endBackgroundTask:kKSNBGTask];
-            kKSNBGTask = UIBackgroundTaskInvalid;
+            kKSNBGActive = NO;
         }
     }];
+    kKSNBGActive = (kKSNBGTask != UIBackgroundTaskInvalid);
     NSLog(@"[KSN] 后台任务开启 id=%lu", (unsigned long)kKSNBGTask);
 }
 
 static void KSNEndBGTask(void) {
     UIApplication *app = UIApplication.sharedApplication;
-    if (kKSNBGTask != UIBackgroundTaskInvalid && app) {
+    if (kKSNBGActive && app) {
         [app endBackgroundTask:kKSNBGTask];
-        kKSNBGTask = UIBackgroundTaskInvalid;
     }
+    kKSNBGActive = NO;
 }
 
 void KSNApplyKeepAlive(void) {
