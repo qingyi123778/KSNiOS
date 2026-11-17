@@ -1,0 +1,9 @@
+Package: com.ksn.ios
+Name: KSN Study iOS
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Description: 学习通 iOS 端签到增强 —— 原生 WebKit 注入，不含答题
+Maintainer: ksn
+Author: ksn
+Section: Tweaks
+Depends: mobilesubstrate
