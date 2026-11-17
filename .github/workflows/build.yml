@@ -20,10 +20,13 @@ jobs:
       - name: 拉取 iOS SDK
         run: |
           mkdir -p "$HOME/theos/sdks"
-          curl -fL --retry 3 -o /tmp/sdk.tar.xz \
-            https://github.com/theos/sdks/releases/download/master/iPhoneOS16.5.sdk.tar.xz
+          SDK_URL="https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz"
+          echo "取 $SDK_URL"
+          curl -fL --retry 3 --retry-delay 2 -o /tmp/sdk.tar.xz "$SDK_URL"
+          ls -lh /tmp/sdk.tar.xz
           tar -xJf /tmp/sdk.tar.xz -C "$HOME/theos/sdks"
           ls -1 "$HOME/theos/sdks"
+          test -d "$HOME/theos/sdks/iPhoneOS16.5.sdk"
 
       - name: 编译
         run: |
