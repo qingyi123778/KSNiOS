@@ -51,6 +51,54 @@
            (t ? " " + t.slice(0, 90) : (r && r.err ? " " + r.err : ""));
   }
 
+  /* ---------- 请求嗅探 ----------
+     在页面里 hook fetch / XHR，记录学习通 H5 自己发的签到请求。
+     走 JS 层拿明文，不碰 TLS，不需要 CA 证书，SSL Pinning 也拦不住。
+     只在 documentStart 注入一次，越早越好 —— 晚于页面自己的请求就漏了。 */
+  function installSpy() {
+    if (window.__KSN_SPY) return;
+    window.__KSN_SPY = 1;
+    var hit = /mobilelearn|chaoxing/i;
+
+    try {
+      var of = window.fetch;
+      if (of) {
+        window.fetch = function (input, init) {
+          try {
+            var u = (typeof input === "string") ? input : ((input && input.url) || "");
+            if (hit.test(u)) {
+              var b = (init && init.body) ? String(init.body) : "";
+              call("spy", { u: String(u).slice(0, 300),
+                            m: ((init && init.method) || "GET"),
+                            b: b.slice(0, 500) });
+            }
+          } catch (e) {}
+          return of.apply(this, arguments);
+        };
+      }
+    } catch (e) { log("spy fetch 失败 " + e); }
+
+    try {
+      var oo = XMLHttpRequest.prototype.open;
+      var os = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (m, u) {
+        this.__ksnU = u; this.__ksnM = m;
+        return oo.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function (b) {
+        try {
+          if (hit.test(String(this.__ksnU || ""))) {
+            call("spy", { u: String(this.__ksnU).slice(0, 300),
+                          m: this.__ksnM || "GET",
+                          b: b ? String(b).slice(0, 500) : "" });
+          }
+        } catch (e) {}
+        return os.apply(this, arguments);
+      };
+    } catch (e) { log("spy xhr 失败 " + e); }
+  }
+  installSpy();
+
   function loadCfg() {
     return call("cfg").then(function (c) {
       if (c && typeof c === "object") CFG = c;

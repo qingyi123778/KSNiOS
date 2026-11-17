@@ -98,6 +98,18 @@ static void *kKSNBridgeAttached = &kKSNBridgeAttached;
         if (c.length) { s.cachedSignCode = c; return c; }
         return s.cachedSignCode ?: @"";
     }
+    if ([cmd isEqualToString:@"spy"]) {
+        [s appendSpy:a];
+        NSString *u = [a[@"u"] isKindOfClass:NSString.class] ? a[@"u"] : @"";
+        if ([u rangeOfString:@"sign" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+            [u rangeOfString:@"active" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            NSString *b = [a[@"b"] isKindOfClass:NSString.class] ? a[@"b"] : @"";
+            if (b.length > 70) b = [b substringToIndex:70];
+            self.lastStatus = [NSString stringWithFormat:@"SPY %@ %@\n%@",
+                               a[@"m"] ?: @"GET", u, b];
+        }
+        return @YES;
+    }
     if ([cmd isEqualToString:@"state"]) {
         NSString *m = [a[@"m"] isKindOfClass:NSString.class] ? a[@"m"] : @"";
         if (m.length) self.lastStatus = m;

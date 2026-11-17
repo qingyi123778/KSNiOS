@@ -23,6 +23,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)applyFromBridge:(NSDictionary *)d;  // 从 JS 回写
 - (nullable NSString *)faceBase64;          // 人脸图（大对象单独落盘）
 - (void)setFaceBase64:(nullable NSString *)b64;
+
+/* 页面里嗅探到的请求，一行一条 JSON 追加到 Library/KSN/spy.log。
+   超过 512KB 自动清空，避免长期开着把沙盒撑爆。 */
+- (void)appendSpy:(NSDictionary *)d;
+- (NSString *)spyPath;
+
 - (void)flush;
 
 @end

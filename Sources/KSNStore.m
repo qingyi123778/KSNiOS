@@ -77,6 +77,49 @@ static NSString *KSNKey(NSString *s) { return [@"ksn_" stringByAppendingString:s
     [b64 writeToFile:[self facePath] atomically:YES encoding:NSUTF8StringEncoding error:NULL];
 }
 
+#pragma mark - 请求嗅探落盘
+
+- (NSString *)spyPath {
+    NSString *lib = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *dir = [lib stringByAppendingPathComponent:@"KSN"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+    return [dir stringByAppendingPathComponent:@"spy.log"];
+}
+
+- (void)appendSpy:(NSDictionary *)d {
+    if (![d isKindOfClass:NSDictionary.class]) return;
+    NSData *json = [NSJSONSerialization dataWithJSONObject:d options:0 error:NULL];
+    if (!json) return;
+
+    NSMutableData *line = [json mutableCopy];
+    [line appendBytes:"\n" length:1];
+
+    NSString *p = [self spyPath];
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    NSDictionary *attr = [fm attributesOfItemAtPath:p error:NULL];
+    if (attr && [attr fileSize] > 512 * 1024) {
+        [fm removeItemAtPath:p error:NULL];
+    }
+
+    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:p];
+    if (fh) {
+        @try {
+            [fh seekToEndOfFile];
+            [fh writeData:line];
+        } @catch (NSException *e) {
+            NSLog(@"[KSN] spy 写入异常 %@", e);
+        } @finally {
+            [fh closeFile];
+        }
+    } else {
+        [line writeToFile:p atomically:YES];
+    }
+}
+
 #pragma mark - 桥用快照
 
 - (NSDictionary *)snapshot {
